@@ -1,0 +1,33 @@
+# --- Большие регенерируемые данные ---
+# декомпиляция (scripts/decompile_apks.py из original_apks/)
+decompiled/
+# извлечение строк (extract_cjk.py)
+extracted/
+# исходные APK-и прошивки (~5.3G)
+original_apks/
+# генерируемые оверлеи (generate_overlays*.py)
+overlays/
+overlays_static/
+# временные папки сборки
+overlay_build/
+overlay_build_static/
+# собранные RRO-APK
+apks_rro_min/
+apks_rro_static/
+
+# --- БД (derive: create_db.py) ---
+database/
+
+# --- Логи / артефакты сессий ---
+logs/
+__pycache__/
+*.pyc
+
+# --- Windows-бэкапы / временные файлы ---
+*.bak
+*.orig
+*.tmp
+~$*
+
+# Платформенные бинарные тулзы (shot/deepl и их .exe) держим в git —
+# проект разрабатывается и на Windows (.bat), и на Linux (.sh).
