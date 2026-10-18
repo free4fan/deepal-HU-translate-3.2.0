@@ -744,8 +744,10 @@ locale, /vendor/overlay, crash/FATAL/ANR(+trace, auto root), main-лог
 
 - **P1 (отменён после проверки bat'ов)**: единения префикса NЕТ —
   `com.android.vendor.*` у динамических = скрытие из лаунчера.
-- wake-word `***你好` в `WT_VehicleCenter/Exterior_voice_interaction_title`
-  НЕ переводится (голосовая команда) — в `CJK_WHITELIST`.
+- Голосовые wake-words НЕ переводятся — в `CJK_WHITELIST` (3 записи WT_VehicleCenter):
+  `Exterior_voice_interaction_title` (`***你好`), `voice_custom_wake_work_hint`
+  (你好深蓝 + пинин), `voice_wakeup_hint` (你好深蓝/深蓝你好 + пинин).
+  В `ru` для них остаётся оригинальный CJK + пинин (18.10: добавлены 2 новые).
 - Arrays: пустые `<item></item>` обязательны (индексы 0..N-1 непрерывно;
   сдвинутый индекс = сдвинутые статусы Wi-Fi на ГУ).
 - Plurals: `few`/`many` пишутся как копия `other` (пустой `few` = сломанная
@@ -761,8 +763,11 @@ locale, /vendor/overlay, crash/FATAL/ANR(+trace, auto root), main-лог
 
 - Ollama `10.0.0.128:11434`, Java 21+, Python 3.12+,
   Android SDK 34 (`/opt/android-sdk/...`), `aapt2`/`apksigner`, `keys/platform.jks`.
-- Проект НЕ в git — бэкап критичных правок делайте вручную
-  (в сессии 17.09 бэкапы были в `/tmp/opencode/bak_*.json`).
+- Проект **в git** (main, 18.10): identity `free4fan`. `.gitignore` исключает
+  тяжёлые регенерируемые каталоги (decompiled/, extracted/, original_apks/,
+  overlays*/, apks_rro_*/, overlay_build*/) + database/ + logs/ + __pycache__/.
+  Транслируем: исходники, *.py/*.bat/.sh, tools (shot/deepl), keys/, translations*/.
+  Бэкап критичных правок теперь = git commit (раньше — вручную в /tmp/opencode/bak_*.json).
 
 ## Ширина RU vs ZH (перенос на 2 строки) — 19.09
 

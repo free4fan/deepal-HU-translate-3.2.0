@@ -137,6 +137,8 @@ LONG_RATIO_MIN = 0.25
 # Записи, где CJK в ru допустим (voice wake-words):
 CJK_WHITELIST: set[tuple[str, str]] = {
     ("WT_VehicleCenter", "Exterior_voice_interaction_title"),
+    ("WT_VehicleCenter", "voice_custom_wake_work_hint"),
+    ("WT_VehicleCenter", "voice_wakeup_hint"),
 }
 
 # Голосовой wake-word в данных: «***你好» (открытые звёзды, без закрывающих) —

@@ -22,7 +22,11 @@ DB_PATH = SCRIPT_DIR / "database" / "translations.sqlite3"
 
 # Форматтеры (как в validate.py / improve_translations.py): паритет между zh и ru.
 FORMATTER_RE = re.compile(r"%(\d+\$)?(\.?\d*)([dfs])|%%")
-CJK_WHITELIST = {("WT_VehicleCenter", "Exterior_voice_interaction_title")}
+CJK_WHITELIST = {
+    ("WT_VehicleCenter", "Exterior_voice_interaction_title"),
+    ("WT_VehicleCenter", "voice_custom_wake_work_hint"),
+    ("WT_VehicleCenter", "voice_wakeup_hint"),
+}
 
 
 def _specs(s: str) -> list[str]:

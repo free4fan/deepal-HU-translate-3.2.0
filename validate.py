@@ -83,7 +83,9 @@ def effective_value_bytes(e: dict, ru: str) -> int:
 
 # Переводу не подлежит (голосовые wake-words / технический CJK):
 CJK_WHITELIST = {
-    ("WT_VehicleCenter", "Exterior_voice_interaction_title"): "voice wake-word 你好",
+    ("WT_VehicleCenter", "Exterior_voice_interaction_title"): "voice wake-word ***你好",
+    ("WT_VehicleCenter", "voice_custom_wake_work_hint"): "voice wake-word 你好深蓝 + пинин",
+    ("WT_VehicleCenter", "voice_wakeup_hint"): "voice wake-word 你好深蓝/深蓝你好 + пинин",
 }
 
 errors: list[tuple[str, str]] = []
