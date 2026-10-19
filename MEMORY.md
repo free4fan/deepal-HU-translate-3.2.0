@@ -814,7 +814,7 @@ RRO физически не достигает. Доказательство в 
 `android:text="…"`.
 
 Классификация видных на скринах 19.10 фраз (полный сценарий проверки —
-скрипты в /tmp/opencode/inv_*.py):
+скрипты перенесены в `scripts/inv_*` + `scripts/README.md`, прогон A→K):
 - **A. layout-литералы** (RRO не трогает): 详情, 自动, 就依次执行,
   语音播报, P挡 (WT_AISceneMode/activity_scene_preview.xml + dialog);
   未连接 (WT_VehicleCenter/item_*_recycleview.xml — у резидента res-строки
