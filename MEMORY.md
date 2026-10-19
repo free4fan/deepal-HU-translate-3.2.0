@@ -795,6 +795,58 @@ locale, /vendor/overlay, crash/FATAL/ANR(+trace, auto root), main-лог
 - Пороги (`FIT_*`) — env-переопределяемые константы в `strwidth.py`; после
   первого полного прогона подкрутить по `logs/fit_report.txt`.
 
+## КРИТИЧНО: layout-литералы — второй класс «нет перевода» (19.10, диагностика по скриншотам)
+
+Симптом: на ГУ в одних и тех же экранах RU работает («Если», «Звук низкой
+скорости», «Доступные сети»), а рядом — китайский («详情», «换挡音»,
+「未连接」, «大灯高度»). Проверка показала, что переводы **есть в JSON, в
+overlays и в собранных APK (aapt2 dump: string/plurals/array — и только
+они, в RRO-APK НЕТ layout/drawable)**, но на экране — zh.
+
+**Корень: в APK прошивки ~3783 CJK-литерала захардкожены прямо в layout-XML**
+(`android:text="详情"` и т.п.) в 1127 layout-файлах / ~51 приложении
+(топ: WT_VehicleCenter 305, WT_NewLauncher 256, WT_TinnoveSmartScene 219,
+EMode 200, WT_HDCloudCamera 186, WT_BTPhone 165, ...). Наш пайплайн
+генерирует ТОЛЬКО `values/strings.xml`+arrays+plurals → layout-литералам
+RRO физически не достигает. Доказательство в экране «Звук» (автоскан):
+`fragment_sound_new.xml` — у соседних текстов `@string/low_speed_clew_tone`
+(переводится), у «换挡音»/«车外音»/«闭锁音» — литерал
+`android:text="…"`.
+
+Классификация видных на скринах 19.10 фраз (полный сценарий проверки —
+скрипты в /tmp/opencode/inv_*.py):
+- **A. layout-литералы** (RRO не трогает): 详情, 自动, 就依次执行,
+  语音播报, P挡 (WT_AISceneMode/activity_scene_preview.xml + dialog);
+  未连接 (WT_VehicleCenter/item_*_recycleview.xml — у резидента res-строки
+  txt_disconnect ЕСТЬ, но списка её не использует); 数据来源:运营商
+  (fragment_network.xml); 自定义 (WT_NewLauncher/fragment_driving_car_last*.xml);
+  歌词 (там же + customization_hud.xml); 左/右 (fragment_show.xml);
+  换挡音/车外音/闭锁音 (fragment_sound_new.xml); 更多
+  (fragment_idd_setting_energy.xml); 大灯高度
+  (fragment_ligth_setting_outside_c857.xml); 左后锁/右后锁
+  (view_function_title_with_select.xml — и в android:text, и в
+  contentDescription); 零重力模式/进入
+  (dialog_passenger_seat_adjust_zero_gravity.xml).
+- **B. runtime/данные (фундаментально не RRO, см. 22.09)**: низкого-батар.
+  заряд-напоминание, 电池包瘪了, 驾驶-车辆档位, 驾驶-电池电量, ≤20%
+  (user-сценарии scene.db); 赠送流量包 / 截止至2026/10/08 (TBOX-данные
+  SIM); 缓速序列/经典 (имена пресетов звука — код WT_VehicleCenter
+  пишет их в TextView lowSoundStyleTv/lockStyleTv, в layout пустые;
+  res-копии есть в WT_SmartSoundEffect (slow_sequence=«Замедление»), но
+  их ни layout, ни видимый экран не используют).
+- **C. @string-страницы с готовым RRO не нашлись** в видимых zh-фразах
+  («Поочерёдно» и др. либо не показаны на скринах, либо — B).
+
+**Следствия:** «перевод есть в оверлее, но не отображается» — для класса A
+это НЕ баг RRO (RRO не содержит layouts), а дизайн-ограничение: лечится
+**только** включением layout в оверлей. Варианты: (1) пилот — static RRO
+с кустно-доделанными layout-файлами для 2-3 самых видимых экранов
+(risk: RU шире ZH в фикс-px кнопках, см. §ширина RU vs ZH); (2) полный
+(layout-генератор + LLM-перевод 3783 литерлов + resid-pinning для layout,
+в т.ч. apps без public.xml). До решения — НЕ строить; валидатор (validate.py)
+и self-test при layout-поддержке обязат. расширить (placeholder-parity для
+layout-текстов — `%s` в `android:text` тоже гоняется).
+
 ## Известные остатки (не блокирующие)
 
 - **8 строк не влезает в лимит aapt2 (32 700 UTF-8-байт, 01.10)** и
