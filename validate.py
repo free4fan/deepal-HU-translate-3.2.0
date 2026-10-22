@@ -86,6 +86,17 @@ CJK_WHITELIST = {
     ("WT_VehicleCenter", "Exterior_voice_interaction_title"): "voice wake-word ***你好",
     ("WT_VehicleCenter", "voice_custom_wake_work_hint"): "voice wake-word 你好深蓝 + пинин",
     ("WT_VehicleCenter", "voice_wakeup_hint"): "voice wake-word 你好深蓝/深蓝你好 + пинин",
+} | {
+    # название приложения 小桐畅联 (XiaoTong ChangLian) — НЕ транслитеруется,
+    # на ГУ должно отображаться иероглифами (21.10):
+    ("WT_Link", n): "brand 小桐畅联" for n in (
+        "accessibility_open_tip", "app_name", "c928_qr_tip_download_tip",
+        "connect_fail_open_again", "dialog_control_tip_hint",
+        "dialog_control_tip_msg", "open_wifi_restart_app",
+        "phone_permission_tip", "qr_new_tip_sub", "qr_tip_download_app",
+        "qr_tip_download_tip", "qr_tip_main", "qr_tip_new",
+        "qr_tip_new_half", "qr_tip_sub", "scan_code_tip", "wifi_p2p_name",
+    )
 }
 
 errors: list[tuple[str, str]] = []

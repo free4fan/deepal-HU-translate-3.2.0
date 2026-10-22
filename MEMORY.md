@@ -748,6 +748,14 @@ locale, /vendor/overlay, crash/FATAL/ANR(+trace, auto root), main-лог
   `Exterior_voice_interaction_title` (`***你好`), `voice_custom_wake_work_hint`
   (你好深蓝 + пинин), `voice_wakeup_hint` (你好深蓝/深蓝你好 + пинин).
   В `ru` для них остаётся оригинальный CJK + пинин (18.10: добавлены 2 новые).
+- Название приложения **小桐畅联** (WT_Link) НЕ транслитеруется — в `CJK_WHITELIST`
+  17 записей (21.10): app_name, qr_*_tip*, wifi_p2p_name, dialog_control_tip_*,
+  accessibility_open_tip, phone_permission_tip, c928_qr_tip_download_tip,
+  scan_code_tip, connect_fail_open_again, open_wifi_restart_app. В `ru` — «小桐畅联»
+  внутри русского текста (раньше было «Сяотунчанлянь»/«Сяотун Чанлянь» — 18 вхождений
+  заменено). Правило продублировано в `promt.md` §Бренды (п.5 самопроверки): названия
+  приложений — в иероглифах. Паттерн общий: при новом китайском названии приложения
+  → та же процедура (замена в ru + запись в CJK_WHITELIST ×3).
 - Arrays: пустые `<item></item>` обязательны (индексы 0..N-1 непрерывно;
   сдвинутый индекс = сдвинутые статусы Wi-Fi на ГУ).
 - Plurals: `few`/`many` пишутся как копия `other` (пустой `few` = сломанная
