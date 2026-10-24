@@ -9,7 +9,7 @@ RRO-оверлеи ресурсов + Go-инструменты.
 |---|---|
 | `apks_rro_min/` — 100 APK (+ `.idsig`) | **Динамические** RRO (пакеты `com.android.vendor.translate.rro.*`): ставятся в `/data/app`, включаются/отключаются через `cmd overlay` — без root-раздела |
 | `apks_rro_static/` — 100 APK (+ `.idsig`) | **Статические** RRO (пакеты `com.deepal.translate.rro.*`): ложатся в `/vendor/overlay/`, активны с загрузки, сменных |
-| `deepl` / `deepl.exe` | Go: **единый менеджер RRO** (заменяет manage.bat): установка/включение/выключение/снятие/статус/отчёт для **обоих** схем — `dyn` и `stat` (root+remount, `/vendor/overlay`). См. §Go-тулзы |
+| `deepl` / `deepl.exe` | Go: **единый менеджер RRO** (заменяет manage.bat). Ставит **обе схемы** — каждое со своим меню: `./deepl` — динамические, `./deepl stat` — статические. Выбор APK внутри обоих меню одинаковый: группы 1–4, TOP-8, все группы, CORE+IMPORTANT, `auto` (все из каталога), `[L]` выбор конкретных пакетов по номерам. См. §Go-тулзы |
 | `shot` / `shot.exe` | Go: снимок живого logcat (main/system/crash) + охота за runtime-фразами (не находятся в APK: scene.db, TTS, ASR-правила). `-q` — конкретная фраза, `-cjk` — все CJK-фрагменты, `-offline` — повторный разбор снимка |
 | `targets.txt` | Список целевых приложений и групп **для deepl**: без него `deepl` не стартует. Изменяемый — под другую прошивку/набор APK достаточно отредактировать файл (списков в самом бинарнике нет) |
 
@@ -38,9 +38,9 @@ apk=apks_rro_min/Fota_RRO.apk
 adb install "$apk"
 adb shell cmd overlay enable --user 0 com.android.vendor.translate.rro.fota
 
-# все разом:
+# все разом (package = префикс + нижний регистр имени, underscore оставляется):
 for f in apks_rro_min/*_RRO.apk; do
-  app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]' | tr '_' '.')
+  app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]')
   adb install "$f" >/dev/null
   adb shell cmd overlay enable --user 0 com.android.vendor.translate.rro.$app
 done
@@ -55,7 +55,7 @@ done
 - Если строка не переключилась сразу, а приложение уже работало —
   убить процесс (`adb shell am force-stop <пакет-таргета>`) или ребут.
 - Снятие: `adb shell pm uninstall com.android.vendor.translate.rro.<app>`
-  (или `./deepl dyn uninstall all`). Список установленных:
+  (или `./deepl dyn uninstall auto`). Список установленных:
   `adb shell pm list packages | grep translate.rro`.
 
 ## Способ 2 — статические RRO (`apks_rro_static/`)
@@ -68,20 +68,21 @@ done
 ```bash
 adb root && adb remount
 for f in apks_rro_static/*_RRO.apk; do
-  pkg="com.deepal.translate.rro.$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
-  adb shell mkdir -p "/vendor/overlay/$pkg"
-  adb push "$f" "/vendor/overlay/$pkg/"
+  app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]')
+  adb shell mkdir -p "/vendor/overlay/com.deepal.translate.rro.$app"
+  adb push "$f" "/vendor/overlay/com.deepal.translate.rro.$app/"
 done
 adb reboot
 ```
 
-> Через менеджер: `./deepl stat install all` (делает root+remount,
-> mkdir и push сам).
+> Через менеджер удобнее: `./deepl stat` — меню установки статики (те же
+> варианты выбора APK, что и в `./deepl`: группы, `[L]` по номерам, `auto`),
+> делает root+remount, mkdir и push сам.
 
 Особенности:
 - после установки нужен **reboot** (оверлеи `/vendor/overlay` читаются при boot);
 - снятие: `adb shell rm -rf /vendor/overlay/<pkg>` (или
-  `./deepl stat uninstall all`) + reboot;
+  `./deepl stat uninstall auto`) + reboot;
 - если `adb remount` не прошёл (verity): динамический способ — единственный.
 
 ## Проверка
@@ -101,23 +102,49 @@ aapt2 dump resources apks_rro_min/Fota_RRO.apk | grep -m3 '()"'
 ### deepl — менеджер RRO (динамические + статические)
 
 Единая замена `manage.bat`/`manage_static.bat`/`collect_report.bat`.
-Интерактивное меню — просто `./deepl` (динамические) или `./deepl stat`.
+**Обе схемы ставятся из этого же приложения — у каждой своё меню**,
+которое открывается аргументом запуска. Выбор APK внутри **обоих** меню —
+одна и та же цель (группы + `[L]`/`auto`).
+
+- **Динамические** — `./deepl` (или `./deepl dyn`). Берут
+  `apks_rro_min/*.apk`, установка = `adb install` + `cmd overlay enable`,
+  обратимо (есть enable/disable).
+- **Статические** — `./deepl stat`. Берут `apks_rro_static/*.apk`,
+  установка = root+remount → `adb push` в `/vendor/overlay`, активны с
+  загрузки. enable/disable отсутствуют (оверлей «всегда включён» после
+  reboot; выключение = удаление).
 
 ```bash
-./deepl                      # меню — динамические (группы 1–4; install+enable)
-./deepl stat                 # меню — статические (группы 1–5; install/uninstall по /vendor/overlay)
-./deepl dyn install auto     # динам.: установка+enable всей схемы (CLI, без меню)
-./deepl dyn status           # состояние (какие включены/выключены)
-./deepl dyn report           # zip-отчёт: pm list, overlay states, locale, logcat
-./deepl stat install all     # статические: root+remount → /vendor/overlay (все группы)
-./deepl stat uninstall all   # статические: удалить все из /vendor/overlay
-./deepl report dyn           # zip-отчёт по схеме dyn
+# Интерактивные меню (после выбора действия — цель 1/2/3/4/8/A/C/auto/L):
+./deepl                      # МЕНЮ динамических  (установить+включить / enable / disable / удалить / status / diag / report / reboot)
+./deepl stat                 # МЕНЮ статических    (установить / удалить / status / diag / report / reboot)
+
+# То же самое без меню (CLI). Пресеты: 1/2/3/4, 8 (TOP-8), A (все группы),
+# C (2+3), auto (все *_RRO.apk из каталога схемы), либо имена пакетов:
+./deepl dyn install auto     # динам.: установка+enable всего из apks_rro_min
+./deepl stat install auto    # статические: root+remount → push всего из apks_rro_static
+./deepl dyn status           # состояние
+./deepl stat uninstall auto  # статические: удалить всё из /vendor/overlay
+./deepl report dyn           # zip-отчёт (dyn)
+./deepl report stat          # zip-отчёт (stat)
 ```
 
-Группы (presets): `1|2|3|4` (dyn) / `1..5` (stat), `8` = TOP-8,
-`A`/`C`/`auto` = наборы, либо имена пакетов через пробел.
+**Выбор APK (общий для dyn и stat, внутри действия):** после выбора
+действия меню показывает цель —
+
+```
+[1] CRITICAL     [2] CORE UI        [3] IMPORTANT APPS
+[4] SECONDARY    [8] TOP-8
+[A] Все группы   [C] CORE+IMPORTANT (2+3)
+[auto] Все *_RRO.apk из каталога схемы (apks_rro_min / apks_rro_static)
+[L] Пакеты — ручной выбор по номерам из списка (5 или 5,12 18)
+```
+
+т.е. можно ставить и **всю схему, и отдельные APK — в обе схемы одинаково**.
+Конкретные пакеты в CLI — по именам: `./deepl dyn install Fota WT_Link`.
 
 Бинарники static (без зависимостей): Linux x86-64 — `deepl`, Windows x86-64 — `deepl.exe`.
+Работает из папки, где лежит `targets.txt` (или задайте `DEEPL_TARGETS=/путь`).
 
 ### shot — охота за runtime-фразами
 
