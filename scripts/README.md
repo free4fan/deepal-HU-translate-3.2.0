@@ -24,6 +24,7 @@
 | `inv_final.py` | verdict по каждой фразе: А=layout / B=runtime / C=@string + dump типов RRO-APK |
 | `find_cjk_in_ru.py` | какие записи JSON содержат CJK в поле `ru` (wake-words) |
 | `check_overlays.py` | видимость заданных имён в `overlays*/.../values{-ru,-zh-rCN}` |
+| `check_intro_breaks.py` | WT_TinnoveSmartScene: где нужны `_`-разрывы в `mode_introduce_*` — сколько страниц (split "_" в IntroductionDialog.smali), сколько строк влезает в страницу диалога (Roboto/PIL, 36sp, 850dp) |
 
 Фраг-списки фраз для диагностики — в самих скриптах (константы), под
 скриншоты 19.10; для нового набора фраз править константу в начале.
