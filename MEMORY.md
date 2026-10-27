@@ -893,6 +893,31 @@ RRO физически не достигает. Доказательство в 
 и self-test при layout-поддержке обязат. расширить (placeholder-parity для
 layout-текстов — `%s` в `android:text` тоже гоняется).
 
+## Восстановление оригинальной локали (zh-CN) — 27.10
+
+**Решение (live, по запросу пользователя)**: «оригинальная локаль» ГУ =
+**`zh-CN`** (OEM, из коробки; до перевода 04.10 locale был `en-US,zh-CN`,
+раньше по якорю 24.09d — `ru-BY,en-US,zh-CN`; «снять перевод системы»
+= вернуть zh-CN).
+
+**Реализовано (единая точка значения, две реализации):**
+- Go `deepl`: константа `originalLocales = "zh-CN"` в `internal/app/locale.go`
+  рядом с `wantLocales = "ru-RU,en-US,zh-CN"`. Режим `ModeLocaleRestore`
+  (CLI `locale-restore`, меню `[9]` в dyn И stat, без цели/root/ops-лога —
+  settings shell работает без root), вывод `[LOCALE] …`. Тесты:
+  `locale_restore_test.go` (константа + Run + no-op), `menu_test.go`
+  (мн [9] dyn/stat), `main_test.go` (parseMode).
+- `manage.bat` + `manage_static.bat`: пункт `[9]` + подпрограмма
+  `:RestoreOrigLocale` (милл-фаз :EnsureRuLocale) + `ACT=locale-restore`
+  в dispatch; блок в `:RUN` — перед root/ops-логом (settings не требует).
+  Wine-parse: оба меню с [9], exit 0.
+- **Синхронизация**: `TestOriginalLocalesConst` держит zh-CN; при изменении
+  оригинальной локали менять одновременно `originalLocales` (Go),
+  `LOCALE_ORIG` в обоих батниках и эту заметку.
+- Примечание: после `locale-restore` RRO-оверлеи (install/enable/push)
+  остаются установлены — их снятие: `dyn uninstall` / `stat uninstall`
+  + reboot. Локаль переживает reboot (settings.db).
+
 ## Известные остатки (не блокирующие)
 
 - **8 строк не влезает в лимит aapt2 (32 700 UTF-8-байт, 01.10)** и
