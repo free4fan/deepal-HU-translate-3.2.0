@@ -2,18 +2,23 @@ package adb
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
 // mock — единая точка подмены: execFn отвечает на все команды,
-// availableFn управляет наличием adb, devices — вывод `adb devices`.
+// availableFn управляет наличием adb, devices — вывод `adb devices`,
+// logBuf — буфер прогресса (a.Logger), где ищут строки.
 type mock struct {
 	*Adb
 	calls     []string // "devices", "kill-server", "shell id -u", ...
 	devices   string   // текущий вывод adb devices
 	available bool
+	logBuf    *strings.Builder
 }
 
 // keyOf — строка команды без имени исполняемого файла: "devices", "kill-server", ...
@@ -31,10 +36,9 @@ func newMock() *mock {
 	a.UnauthWait = time.Millisecond
 	a.RetryDelay = time.Millisecond
 	a.WaitDevPoll = time.Millisecond
-	var b strings.Builder // тихий логгер
+	var b strings.Builder // тихий логгер (не реальный stdout)
 	a.Logger = &b
-	_ = b
-	m := &mock{Adb: a, devices: "List of devices attached\n", available: true}
+	m := &mock{Adb: a, devices: "List of devices attached\n", available: true, logBuf: &b}
 	a.execFn = func(_ context.Context, name string, args ...string) (string, string, int) {
 		key := keyOf(name, args...)
 		m.calls = append(m.calls, key)
@@ -97,8 +101,8 @@ func TestCheckUnavailable(t *testing.T) {
 	if got := m.Check(context.Background()); got {
 		t.Error("Check(no adb) = true, want false")
 	}
-	if !strings.Contains(m.Logger.String(), "adb not found") {
-		t.Errorf("лог не содержит 'adb not found': %q", m.Logger.String())
+	if !strings.Contains(m.logBuf.String(), "adb not found") {
+		t.Errorf("лог не содержит 'adb not found': %q", m.logBuf.String())
 	}
 }
 
@@ -108,7 +112,7 @@ func TestCheckImmediateDevice(t *testing.T) {
 	if got := m.Check(context.Background()); !got {
 		t.Error("Check(device сразу) = false, want true")
 	}
-	if !strings.Contains(m.Logger.String(), "[OK] ADB connected.") {
+	if !strings.Contains(m.logBuf.String(), "[OK] ADB connected.") {
 		t.Error("нет '[OK] ADB connected.' в логе")
 	}
 	if n := countCalls(m.calls, "devices"); n != 1 {
@@ -144,12 +148,23 @@ func TestCheckUnauthLimit(t *testing.T) {
 	if got := m.Check(context.Background()); got {
 		t.Error("Check(перманентный unauthorized) = true, want false")
 	}
-	log := m.Logger.String()
-	if !strings.Contains(log, "НЕ АВТОРИЗОВАНА") {
-		t.Errorf("нет сообщения об авторизации: %q", log)
+	log := m.logBuf.String()
+	if !strings.Contains(log, "ключ НЕ АВТОРИЗОВАН") {
+		t.Errorf("нет сообщения о ключе (unauthorized): %q", log)
+	}
+	if !strings.Contains(log, "публичный ключ") {
+		t.Errorf("нет подсказки про публичный ключ: %q", log)
+	}
+	if !strings.Contains(log, "adbauth") {
+		t.Errorf("нет подсказки про adbauth: %q", log)
 	}
 	if !strings.Contains(log, "остановка.") {
 		t.Errorf("нет 'остановка.': %q", log)
+	}
+	for _, bad := range []string{"АВТОРИЗОВАТЬ", "Для разработчиков", "НЕ АКТИВИРОВАН"} {
+		if strings.Contains(log, bad) {
+			t.Errorf("unauth-цикл: устаревшая формулировка %q:\n%s", bad, log)
+		}
 	}
 	// devices должен быть запрошен 4 раза: 3 ожидания + финальные? Проверим >= 3
 	if n := countCalls(m.calls, "devices"); n < 3 {
@@ -244,4 +259,164 @@ func contains(calls []string, what string) bool {
 		}
 	}
 	return false
+}
+
+// ---- поиск бинарника adb: env DEEPL_ADB -> PATH -> рядом с бинарником ----
+
+// resolveBinTest — Adb с точкой подмены selfBin (тесты).
+func resolveBinTest(t *testing.T, self string) *Adb {
+	t.Helper()
+	a := New()
+	a.selfBin = func() (string, error) {
+		if self == "" {
+			return "", os.ErrNotExist
+		}
+		return self, nil
+	}
+	return a
+}
+
+func TestResolveBinExplicitPath(t *testing.T) {
+	t.Setenv("DEEPL_ADB", "/usr/bin/adb")
+	a := resolveBinTest(t, "")
+	if err := a.ResolveBin(); err != nil {
+		t.Fatalf("ResolveBin: %v", err)
+	}
+	if a.Bin != "/usr/bin/adb" {
+		t.Errorf("Bin=%q, want /usr/bin/adb (env DEEPL_ADB приоритетен)", a.Bin)
+	}
+}
+
+func TestResolveBinExplicitPathMissing(t *testing.T) {
+	t.Setenv("DEEPL_ADB", "/нет/такого/adb")
+	a := resolveBinTest(t, "")
+	if err := a.ResolveBin(); err == nil {
+		t.Fatal("ResolveBin: env DEEPL_ADB указывает на несуществующий файл -> ожидаю ошибку")
+	}
+}
+
+// fakeRoot — фейковый корень: self=.../fake/deepl, рядом adb; переменная
+// PATH в тесте очищена (adb из PATH не подменяется — проверяется статикой).
+func TestResolveBinNextToBinary(t *testing.T) {
+	root := t.TempDir()
+	self := filepath.Join(root, "deepl")
+	os.WriteFile(self, []byte("x"), 0o700)
+	adbName := "adb"
+	if runtime.GOOS == "windows" {
+		adbName = "adb.exe"
+	}
+	adbPath := filepath.Join(root, adbName)
+	os.WriteFile(adbPath, []byte("x"), 0o700)
+
+	t.Setenv("PATH", filepath.Join(root, "empty")) // adb из PATH недоступен
+	a := resolveBinTest(t, self)
+	t.Setenv("DEEPL_ADB", "")
+	if err := a.ResolveBin(); err != nil {
+		t.Fatalf("ResolveBin: %v", err)
+	}
+	if a.Bin != adbPath {
+		t.Errorf("Bin=%q, want %q (adb рядом с бинарником)", a.Bin, adbPath)
+	}
+}
+
+func TestResolveBinNotFound(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())                // пустой PATH
+	a := resolveBinTest(t, t.TempDir()+"/deepl") // каталог без adb рядом
+	if err := a.ResolveBin(); err == nil {
+		t.Fatal("ResolveBin: adb нет нигде -> ожидаю ошибку с подсказкой")
+	}
+}
+
+// ---- checkResult: общий старт проверки (баннер и [R]) ----
+
+func TestCheckResultFast(t *testing.T) {
+	ctx := context.Background()
+
+	m := newMock()
+	m.devices = devDevice()
+	res := m.CheckResult(ctx, true)
+	if !res.OK {
+		t.Error("CheckResult(fast, device).OK=false, want true")
+	}
+	if !strings.Contains(m.logBuf.String(), "[OK] ADB connected.") {
+		t.Errorf("нет строки '[OK] ADB connected.': %q", m.logBuf.String())
+	}
+	m.devices = "List of devices attached\n"
+	res = m.CheckResult(ctx, true)
+	if res.OK {
+		t.Error("CheckResult(fast, none).OK=true, want false")
+	}
+	// ГУ автомобиля: советы «Для разработчиков»/«АВТОРИЗОВАТЬ» неактуальны
+	// (нет доступа к настройкам) — подсказка: кабель + инженерное меню/adbauth.
+	for _, bad := range []string{"Для разработчиков", "АВТОРИЗОВАТЬ", "USB-отладка"} {
+		if strings.Contains(m.logBuf.String(), bad) {
+			t.Errorf("fast(none) советует недоступное на ГУ: %q:\n%s", bad, m.logBuf.String())
+		}
+	}
+	if !strings.Contains(m.logBuf.String(), "инженерное меню") {
+		t.Errorf("fast(none): нет подсказки про инженерное меню:\n%s", m.logBuf.String())
+	}
+	if !strings.Contains(m.logBuf.String(), "adbauth") {
+		t.Errorf("fast(none): нет подсказки про adbauth:\n%s", m.logBuf.String())
+	}
+
+	// unauth: ADB на ГУ уже активно, но публичный ключ adb этого ПК не
+	// добавлен — совет: adbauth (добавить ключ ноутбука), а не «включите ADB».
+	m.devices = devUnauth()
+	res = m.CheckResult(ctx, true)
+	if res.OK {
+		t.Error("CheckResult(fast, unauth).OK=true, want false")
+	}
+	if !strings.Contains(m.logBuf.String(), "публичный ключ adb") {
+		t.Errorf("fast(unauth): нет подсказки про публичный ключ adb:\n%s", m.logBuf.String())
+	}
+	if !strings.Contains(m.logBuf.String(), "adbauth") {
+		t.Errorf("fast(unauth): нет подсказки про adbauth:\n%s", m.logBuf.String())
+	}
+
+	m.available = false
+	res = m.CheckResult(ctx, true)
+	if res.OK {
+		t.Error("CheckResult(no adb).OK=true, want false")
+	}
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "не найден") {
+		t.Errorf("Err без подсказки о поиске: %v", res.Err)
+	}
+	if !strings.Contains(m.logBuf.String(), "DEEPL_ADB") {
+		t.Errorf("в логе нет подсказки про DEEPL_ADB: %q", m.logBuf.String())
+	}
+}
+
+func TestCheckResultFullUsesLog(t *testing.T) {
+	m := newMock()
+	m.devices = devDevice()
+	res := m.CheckResult(context.Background(), false)
+	if !res.OK {
+		t.Error("CheckResult(full, device).OK=false")
+	}
+	// полная проверка пишет про «попытку» (в отличие от fast)
+	if !strings.Contains(m.logBuf.String(), "попытка 1/3") {
+		t.Errorf("нет строки 'попытка 1/3' (full): %q", m.logBuf.String())
+	}
+}
+
+// CheckFast — баннер меню: МОЛЧАЛИВ (строки прогресса дублировали бы
+// строку баннера "ADB: [OK] ..."; симптом 27.10: «[OK] ADB connected.
+// печатался под каждым меню»).
+func TestCheckFastSilent(t *testing.T) {
+	ctx := context.Background()
+	m := newMock()
+	m.devices = devDevice()
+	if got := m.CheckFast(ctx); got != true {
+		t.Fatalf("CheckFast(device)=%v", got)
+	}
+	m.devices = "List of devices attached\n"
+	_ = m.CheckFast(ctx)
+	m.devices = devUnauth()
+	_ = m.CheckFast(ctx)
+	m.available = false
+	_ = m.CheckFast(ctx)
+	if m.logBuf.Len() != 0 {
+		t.Errorf("CheckFast печатает строки (дубль баннера): %q", m.logBuf.String())
+	}
 }

@@ -171,6 +171,120 @@ func TestMenuInvalidPresetNoAdb(t *testing.T) {
 	}
 }
 
+// Баннер в unauthorized-состоянии: своё сообщение (ключ adb этого ПК не
+// добавлен — adbauth), НЕ общее «устройство не найдено».
+func TestMenuBannerUnauthShowsKeyHint(t *testing.T) {
+	ma := NewMockADB()
+	ma.Seams.Exec = func(_ context.Context, name string, args ...string) (string, string, int) {
+		if len(args) > 0 && args[0] == "devices" {
+			return "List of devices attached\nFAKE\tunauthorized\n", "", 0
+		}
+		return "", "", 0
+	}
+	cfg := groups.Dynamic()
+	cfg.Groups = [4][]string{{"Cam"}, nil, nil, nil}
+	cfg.Top8 = []string{"Cam"}
+	w := newCollectWriter(t)
+	a := New(context.Background(), cfg, ma)
+	a.Out = io.Discard
+	a.In = strings.NewReader("0\n")
+	ma.Logger = w
+	m := NewMenu(a, cfg.Scheme, w, a.In)
+	m.Clear = func(io.Writer) {}
+
+	m.Run()
+
+	if !strings.Contains(w.s, "ADB: [!!]") {
+		t.Errorf("баннер unauth должен быть [!!]:\n%s", w.s)
+	}
+	if !strings.Contains(w.s, "ключ adb этого ПК") {
+		t.Errorf("баннер unauth: нет подсказки про ключ adb этого ПК:\n%s", w.s)
+	}
+	if !strings.Contains(w.s, "adbauth") {
+		t.Errorf("баннер unauth: нет подсказки adbauth:\n%s", w.s)
+	}
+	if strings.Contains(w.s, "Устройство не найдено") {
+		t.Errorf("unauth показан как «устройство не найдено» (общее сообщение):\n%s", w.s)
+	}
+}
+
+// Шапка меню: ровно ОДНА строка ADB-статуса, без двойного префикса «ADB: ADB:»
+// и без строки прогресса CheckFast под ней (молчаливая проверка).
+func TestMenuBannerSingleAdLine(t *testing.T) {
+	ma := NewMockADB()
+	cfg := groups.Dynamic()
+	cfg.Groups = [4][]string{{"Cam"}, nil, nil, nil}
+	cfg.Top8 = []string{"Cam"}
+	w := newCollectWriter(t)
+	a := New(context.Background(), cfg, ma)
+	a.Out = io.Discard
+	a.In = strings.NewReader("0\n") // сразу выход — один экран меню
+	ma.Logger = w
+	m := NewMenu(a, cfg.Scheme, w, a.In)
+	m.Clear = func(io.Writer) {}
+
+	m.Run()
+
+	if n := strings.Count(w.s, "ADB:"); n != 1 {
+		t.Errorf("строк с 'ADB:' в шапке %d, want 1:\n%s", n, w.s)
+	}
+	if strings.Contains(w.s, "[OK] ADB connected.") {
+		t.Errorf("строка прогресса CheckFast попала в шапку (дубль баннера):\n%s", w.s)
+	}
+}
+
+// [R] — вывод Check НЕ смахивается мгновенным cls: в конце пауза на ввод.
+func TestMenuRShowsResultAndPauses(t *testing.T) {
+	ma := NewMockADB()
+	cfg := groups.Dynamic()
+	cfg.Groups = [4][]string{{"Cam"}, nil, nil, nil}
+	cfg.Top8 = []string{"Cam"}
+	w := newCollectWriter(t)
+	a := New(context.Background(), cfg, ma)
+	a.Out = io.Discard
+	a.In = strings.NewReader("R\ny\n0\n") // R -> любая клавиша -> выход
+	ma.Logger = w                         // прогресс [R] (строки CheckResult) — в тот же writer, что меню
+	m := NewMenu(a, cfg.Scheme, w, a.In)
+	m.Clear = func(io.Writer) {}
+
+	m.Run()
+
+	if !strings.Contains(w.s, "[OK] ADB connected.") {
+		t.Errorf("R: нет результата проверки:\n%s", w.s)
+	}
+	if !strings.Contains(w.s, "Нажмите любую клавишу") {
+		t.Errorf("R: нет паузы перед следующим меню:\n%s", w.s)
+	}
+}
+
+// [R] с недоступным adb — тоже пауза (иначе видно ничего, симптом «R не работает»).
+func TestMenuRUnavailableShowsErrorAndPauses(t *testing.T) {
+	ma := NewMockADB()
+	ma.Seams.Available = func() bool { return false }
+	cfg := groups.Dynamic()
+	cfg.Groups = [4][]string{{"Cam"}, nil, nil, nil}
+	cfg.Top8 = []string{"Cam"}
+	w := newCollectWriter(t)
+	a := New(context.Background(), cfg, ma)
+	a.Out = io.Discard
+	a.In = strings.NewReader("R\ny\n0\n")
+	ma.Logger = w // прогресс [R] — в тот же writer, что меню
+	m := NewMenu(a, cfg.Scheme, w, a.In)
+	m.Clear = func(io.Writer) {}
+
+	m.Run()
+
+	if !strings.Contains(w.s, "adb not found") {
+		t.Errorf("R: нет ошибки про adb:\n%s", w.s)
+	}
+	if !strings.Contains(w.s, "DEEPL_ADB") {
+		t.Errorf("R: нет подсказки DEEPL_ADB:\n%s", w.s)
+	}
+	if !strings.Contains(w.s, "Нажмите любую клавишу") {
+		t.Errorf("R: нет паузы:\n%s", w.s)
+	}
+}
+
 // captureWriter — io.Writer, коллекция.
 type captureWriter struct{ s string }
 

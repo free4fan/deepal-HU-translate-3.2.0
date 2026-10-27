@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"deepal-hu-translate/internal/adb"
 	"deepal-hu-translate/internal/groups"
 )
 
@@ -42,9 +43,15 @@ func (m *Menu) Run() {
 		case "0":
 			return
 		case "R":
+			// [R] делает ПОЛНУЮ проверку (цикл 3 попытки + рестарт демона),
+			// а не одну fast-проверку. Вывод НЕ смахивается cls: до
+			// следующего экрана пауза на ввод (иначе «ничего не произошло»).
 			fmt.Fprintln(m.out)
-			m.a.Adb.Check(m.a.Ctx)
-			fmt.Fprintln(m.out)
+			res := m.a.Adb.CheckResult(m.a.Ctx, false)
+			if !res.OK && res.Err != nil {
+				fmt.Fprintln(m.out, "  Проверка ADB:", res.Err)
+			}
+			m.pauseAnyKey()
 			continue
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			mode = m.modeFor(choice)
@@ -89,6 +96,15 @@ func (m *Menu) askAgain() bool {
 	return m.readLine() == "Y"
 }
 
+// pauseAnyKey — «Нажмите любую клавишу...» до следующей очистки экрана.
+// Без неё вывод [R] (проверка ADB) мгновенно смахивается cls — симптом
+// «нажал R, НО ничего не происходит» (26.10). Любая клавиша = продолжить
+// (продолжить = следующее меню), EOF = продолжить (цикл меню и так завершит).
+func (m *Menu) pauseAnyKey() {
+	fmt.Fprint(m.out, "\nНажмите любую клавишу для продолжения...")
+	_ = m.sc.Scan()
+}
+
 func (m *Menu) readLine() string {
 	if !m.sc.Scan() {
 		return "0" // EOF -> выход
@@ -122,12 +138,20 @@ func (m *Menu) modeFor(num string) Mode {
 
 func (m *Menu) print(s string) { fmt.Fprint(m.out, s) }
 
-// adbBanner — быстрая проверка (одна `adb devices`), ничего не блокирует.
+// adbBanner — статус ADB в шапке меню (одна быстрая `adb devices`,
+// молчаливая — строки прогресса не печатает, только свой текст).
 func (m *Menu) adbBanner() string {
 	if m.a.Adb.CheckFast(m.a.Ctx) {
-		return " [OK] ADB: устройство подключено"
+		return " [OK] Устройство подключено"
 	}
-	return " [!!] ADB: устройство не найдено. Подключите USB и разрешите отладку (кнопка «АВТОРИЗОВАТЬ» на HU). Повторная проверка - [R]"
+	switch m.a.Adb.DevicesState(m.a.Ctx) {
+	case adb.StateUnauth:
+		// Устройство видят оба adb-server'а, но публичный ключ adb этого ПК
+		// не добавлен на ГУ — лечится adbauth (не «включите ADB»).
+		return " [!!] Устройство НЕ АВТОРИЗОВАНО. Запустите adbauth и добавьте публичный ключ adb этого ПК (adbkey.pub). Повторная проверка - [R]"
+	default:
+		return " [!!] Устройство не найдено. Подключите USB-кабель и включите ADB (инженерное меню ГУ или adbauth). Повторная проверка - [R]"
+	}
 }
 
 func (m *Menu) actionMenu() string {
