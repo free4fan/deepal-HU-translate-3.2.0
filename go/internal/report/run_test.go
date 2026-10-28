@@ -63,8 +63,8 @@ func TestRunDynamic(t *testing.T) {
 		"getprop ro.product.locale":          "ru-RU\n",
 		"getprop persist.sys.locale":         "null\n",
 		"pm list packages --show-versioncode " + cfg.Filter: "package:" + pfx + "camera versionCode:10\n" +
-			"package:" + pfx + "wt_launcher versionCode:3\n",
-		"cmd overlay list --user 0":                              "  [x] " + pfx + "camera (base)\n" + "  [ ] " + pfx + "wt_launcher (base)\n",
+			"package:" + pfx + "wt_newlauncher versionCode:3\n",
+		"cmd overlay list --user 0":                              "  [x] " + pfx + "camera (base)\n" + "  [ ] " + pfx + "wt_newlauncher (base)\n",
 		"logcat -d -b crash -t 500 -v time":                      "01-01 00:00:00.000 E AndroidRuntime: FATAL EXCEPTION: main\n",
 		"logcat -d -s AndroidRuntime:E System.err:W *:S -v time": "FATAL EXCEPTION: main\n",
 		"logcat -d -b main -t 2000 -v time":                      "overlay: enabled camera\nidmap: ok\nplain line\n",
@@ -145,8 +145,8 @@ func TestRunDynamic(t *testing.T) {
 	if !strings.Contains(string(pp), pfx+"camera | ver=10 | overlay=[x]") {
 		t.Errorf("30_per_package: нет camera строки\n%s", string(pp))
 	}
-	if !strings.Contains(string(pp), pfx+"wt_launcher | ver=3 | overlay=[ ]") {
-		t.Errorf("30_per_package: нет wt_launcher\n%s", string(pp))
+	if !strings.Contains(string(pp), pfx+"wt_newlauncher | ver=3 | overlay=[ ]") {
+		t.Errorf("30_per_package: нет wt_newlauncher (цель WT_NewLauncher; старое имя wt_launcher\n      более не в groups)\n%s", string(pp))
 	}
 	// 44_overlay_main: overlay/idmap строки, без plain
 	o44, _ := os.ReadFile(filepath.Join(dir, "report_2026-09-29_100000", "raw", "44_overlay_main.txt"))
