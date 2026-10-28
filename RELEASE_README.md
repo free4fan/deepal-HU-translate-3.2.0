@@ -1,71 +1,79 @@
-# deepal-HU-translate v3.2.0
+# Deepal HU Translate v3.2.0 — установка
 
-Перевод ГУ **Deepal / Changan S05** (прошивка 3.2.0) с китайского на русский:
-RRO-оверлеи ресурсов + Go-инструменты.
+Русский перевод ГУ **Deepal / Changan S05** (прошивка 3.2.0): 102 приложения
+(экраны, меню, dialogs) — строки GUI. Проводится **RRO-оверлеями** (APK,
+которые русские строки накладывают поверх китайских). **Проводку не трогает:**
+перевод в любой момент снимается, ГУ возвращается в исходное состояние.
 
-## Состав
+## Состав папки
 
 | Файл | Что |
 |---|---|
-| `apks_rro_min/` — 100 APK (+ `.idsig`) | **Динамические** RRO (пакеты `com.android.vendor.translate.rro.*`): ставятся в `/data/app`, включаются/отключаются через `cmd overlay` — без root-раздела |
-| `apks_rro_static/` — 100 APK (+ `.idsig`) | **Статические** RRO (пакеты `com.deepal.translate.rro.*`): ложатся в `/vendor/overlay/`, активны с загрузки, сменных |
-| `deepl` / `deepl.exe` | Go: **единый менеджер RRO** (заменяет manage.bat). Ставит **обе схемы** — каждое со своим меню: `./deepl` — динамические, `./deepl stat` — статические. Выбор APK внутри обоих меню одинаковый: группы 1–4, TOP-8, все группы, CORE+IMPORTANT, `auto` (все из каталога), `[L]` выбор конкретных пакетов по номерам. См. §Go-тулзы |
-| `shot` / `shot.exe` | Go: снимок живого logcat (main/system/crash) + охота за runtime-фразами (не находятся в APK: scene.db, TTS, ASR-правила). `-q` — конкретная фраза, `-cjk` — все CJK-фрагменты, `-offline` — повторный разбор снимка |
-| `targets.txt` | Список целевых приложений и групп **для deepl**: без него `deepl` не стартует. Изменяемый — под другую прошивку/набор APK достаточно отредактировать файл (списков в самом бинарнике нет) |
+| `apks_rro_min/` — 100 APK (+ `.idsig`) | **Динамические** RRO (`com.android.vendor.translate.rro.*`): ставятся как обычные приложения, включаются/выключаются через `overlay enable` — без root |
+| `apks_rro_static/` — 100 APK (+ `.idsig`) | **Статические** RRO (`com.deepal.translate.rro.*`): кладутся в `/vendor/overlay/`, активны с загрузки |
+| `deepl` / `deepl.exe` | Менеджер RRO. Ставит **обе схемы** — у каждой своё меню: `./deepl` — динамические, `./deepl stat` — статические. Выбор APK внутри обоих меню одинаковый |
+| `shot` / `shot.exe` | Снимок logcat + охота за runtime-фразами (не те, что в APK): `-q "фраза"`, `-cjk`, `-offline shot_*.log` |
+| `targets.txt` | Список приложений-целей для `deepl` (**не удалять** — без него `deepl` не стартует) |
 
-## Предварительно (для обоих методов)
+## Установка — 3 шага
 
-PC с `adb` (Android platform-tools) в PATH; ГУ подключено USB (или adb-over_TCP);
-отладка на ГУ включена.
+1. Подключите ГУ по USB, включите ADB (инженерное меню ГУ; подтвердить
+   авторизацию на экране ГУ). Проверьте: `adb devices` → `device`.
+   Меню `deepl` не видит ГУ → пункт `[R] Проверить ADB заново`.
+2. Запустите `deepl` (Windows — `deepl.exe`) **из этой папки**:
+   - Динамические (обычный путь): `[1] Установить + включить` → цель:
+     `8` — TOP-8 (быстрый чек), `A` — всё, `[L]` — поштучно по номерам.
+   - Статические (нужен root): `./deepl stat` → `[1] Установить` → после
+     установки — перезагрузка (`[6]` или `adb reboot`).
+3. Готово. RU появляется после перезапуска приложений (закрыть из «недавних»)
+   или reboot.
+
+**Чем динамические отличаются от статических:**
+
+| | Динамические (`apks_rro_min`) | Статические (`apks_rro_static`) |
+|---|---|---|
+| Куда | `/data/app` (обычная установка) | `/vendor/overlay` (root+remount) |
+| Вкл/выкл | да (`[2]`/`[3]` в меню) | нет — всегда активны с загрузки |
+| Снятие | `[3]`/`[4]` сразу | удаление `[2]` + reboot |
+| Сколько ставится | 91 из 100 (9 AOSP-пакетов не ставятся `adb install`) | 100 |
+| Переживает сдвиг `/data` | нет | да |
+
+## Как вернуть всё как было
+
+- **Динамические:** `[3] Отключить`, `[4] Удалить` (меню `./deepl`).
+- **Статические:** `./deepl stat` → `[2] Удалить` + reboot.
+- **Локаль ГУ:** при установке перевод выставлял `system_locales =
+  ru-RU,en-US,zh-CN`. Пункт меню **`[9] Восстановить оригинальную локаль`**
+  возвращает `zh-CN` (как из коробки). Оверлеи при этом **не** удаляются —
+  для них пункты `[3]`/`[4]`/`[2]`.
+
+## Небольшие (краткая справка)
+
+| | Команда |
+|---|---|
+| Весь dyn (install+enable) | `./deepl dyn install A` |
+| Весь stat (→ /vendor/overlay) | `./deepl stat install auto` |
+| Снять всё stat | `./deepl stat uninstall auto` |
+| Статус | `./deepl dyn status` / `[5]` в меню |
+| Локаль в zh-CN | `./deepl dyn locale-restore` / `[9]` |
+| Report (zip) | `./deepl report dyn` (или `stat`) / `[7]` в меню |
+
+Цели (presets) в CLI: `1|2|3|4` (группы), `8` (TOP-8), `A` (все группы),
+`C` (группы 2+3), `auto` (все APK каталога схемы), либо имена пакетов
+через пробел: `./deepl dyn install Camera WT_NewLauncher`.
+
+**Ручная установка (adb, без deepl):**
 
 ```bash
-adb root
-# если «Отказано» — в настройках ГУ разрешить «Отладка по USB» в root-режиме
-# (Developer options → USB debugging (Security settings))
-
-# ru в НАЧАЛЕ списка системных локалей: OEM-приложения проверяют текущую
-# локаль; если начать ставить до этого — часть строк не переключится.
-adb shell settings put system system_locales ru-RU,zh-CN,en-US
-```
-
-## Способ 1 — динамические RRO (`apks_rro_min/`)
-
-Обратимо: ставить/отключать без входа в /vendor.
-
-```bash
-# один пакет:
-apk=apks_rro_min/Fota_RRO.apk
-adb install "$apk"
-adb shell cmd overlay enable --user 0 com.android.vendor.translate.rro.fota
-
-# все разом (package = префикс + нижний регистр имени, underscore оставляется):
+# динамические:
+adb shell settings put system system_locales ru-RU,en-US,zh-CN
 for f in apks_rro_min/*_RRO.apk; do
   app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]')
-  adb install "$f" >/dev/null
+  adb install "$f"
   adb shell cmd overlay enable --user 0 com.android.vendor.translate.rro.$app
 done
-```
 
-> Удобнее через менеджер: `./deepl dyn install auto` (см. ниже,
-> один прогон = установка+enable+статус по всем группам).
-
-Особенности:
-- `cmd overlay enable` нужен от root (`adb root`); если выдаёт
-  «UID2000 is not allowed» — повторить `adb root` и повторить команду.
-- Если строка не переключилась сразу, а приложение уже работало —
-  убить процесс (`adb shell am force-stop <пакет-таргета>`) или ребут.
-- Снятие: `adb shell pm uninstall com.android.vendor.translate.rro.<app>`
-  (или `./deepl dyn uninstall auto`). Список установленных:
-  `adb shell pm list packages | grep translate.rro`.
-
-## Способ 2 — статические RRO (`apks_rro_static/`)
-
-Активны с загрузки, отключаться не деградируют.
-
-Требуется запись в `/vendor` (обычно доступно после `adb root && adb remount`;
-на части прошивок remount не разрешён — тогда есть только способ 1):
-
-```bash
+# статические (нужен root+remount; на части прошивок remount запрещён (verity)):
 adb root && adb remount
 for f in apks_rro_static/*_RRO.apk; do
   app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]')
@@ -75,107 +83,28 @@ done
 adb reboot
 ```
 
-> Через менеджер удобнее: `./deepl stat` — меню установки статики (те же
-> варианты выбора APK, что и в `./deepl`: группы, `[L]` по номерам, `auto`),
-> делает root+remount, mkdir и push сам.
-
-Особенности:
-- после установки нужен **reboot** (оверлеи `/vendor/overlay` читаются при boot);
-- снятие: `adb shell rm -rf /vendor/overlay/<pkg>` (или
-  `./deepl stat uninstall auto`) + reboot;
-- если `adb remount` не прошёл (verity): динамический способ — единственный.
-
 ## Проверка
 
-```bash
-adb shell cmd overlay listenabled | grep -c translate   # сколько включено (dyn)
-# список /vendor/overlay (static):
-adb shell ls /vendor/overlay | grep deepal
-# строки оверлея (вытянули из APK — сравните с экраном ГУ):
-aapt2 dump resources apks_rro_min/Fota_RRO.apk | grep -m3 '()"'
-# на ГУ: открыть экран приложения — строки должны быть по-русски
-# (ru-значение видно в settings system_locales: adb shell settings get system system_locales)
-```
+- Любое приложение (мультимедиа/центр авто/камера) — по-русски.
+- `[5] Статус` в меню: по 100 пакетов «УСТАНОВЛЕН / НЕ» + оверлей `[x]`/`[ ]`.
+- `adb shell settings get system system_locales` → `ru-RU,en-US,zh-CN`.
+- `[7] Собрать логи` → `logs/deepl_<scheme>_report_<TS>.zip` (внутри
+  `summary.txt` — читать первым).
 
-## Go-тулзы
+## Если что-то не работает
 
-### deepl — менеджер RRO (динамические + статические)
-
-Единая замена `manage.bat`/`manage_static.bat`/`collect_report.bat`.
-**Обе схемы ставятся из этого же приложения — у каждой своё меню**,
-которое открывается аргументом запуска. Выбор APK внутри **обоих** меню —
-одна и та же цель (группы + `[L]`/`auto`).
-
-- **Динамические** — `./deepl` (или `./deepl dyn`). Берут
-  `apks_rro_min/*.apk`, установка = `adb install` + `cmd overlay enable`,
-  обратимо (есть enable/disable).
-- **Статические** — `./deepl stat`. Берут `apks_rro_static/*.apk`,
-  установка = root+remount → `adb push` в `/vendor/overlay`, активны с
-  загрузки. enable/disable отсутствуют (оверлей «всегда включён» после
-  reboot; выключение = удаление).
-
-**Снятие перевода системы (локаль):** меню dyn/stat — пункт `[9]`
-«Восстановить оригинальную локаль» (возвращает `system_locales` в `zh-CN` —
-как ГУ из коробки; обратная операция установки RU), в bat-менеджерах тот же
-пункт `[9]`, в CLI — `./deepl dyn locale-restore` (локаль — настройка самой
-системы, работает одинаково для обеих схем RRO). Оверлеи при этом НЕ удаляются: чтобы вернуть ГУ
-полностью — снять (uninstall) установленные RRO и перезагрузить.
-Применяется без root; уже запущенным приложениям видно после их перезапуска
-или reboot ГУ.
-
-```bash
-# Интерактивные меню (после выбора действия — цель 1/2/3/4/8/A/C/auto/L):
-./deepl                      # МЕНЮ динамических  (установить+включить / enable / disable / удалить / status / diag / report / reboot)
-./deepl stat                 # МЕНЮ статических    (установить / удалить / status / diag / report / reboot)
-
-# То же самое без меню (CLI). Пресеты: 1/2/3/4, 8 (TOP-8), A (все группы),
-# C (2+3), auto (все *_RRO.apk из каталога схемы), либо имена пакетов:
-./deepl dyn install auto     # динам.: установка+enable всего из apks_rro_min
-./deepl stat install auto    # статические: root+remount → push всего из apks_rro_static
-./deepl dyn status           # состояние
-./deepl stat uninstall auto  # статические: удалить всё из /vendor/overlay
-./deepl report dyn           # zip-отчёт (dyn)
-./deepl report stat          # zip-отчёт (stat)
-```
-
-**Выбор APK (общий для dyn и stat, внутри действия):** после выбора
-действия меню показывает цель —
-
-```
-[1] CRITICAL     [2] CORE UI        [3] IMPORTANT APPS
-[4] SECONDARY    [8] TOP-8
-[A] Все группы   [C] CORE+IMPORTANT (2+3)
-[auto] Все *_RRO.apk из каталога схемы (apks_rro_min / apks_rro_static)
-[L] Пакеты — ручной выбор по номерам из списка (5 или 5,12 18)
-```
-
-т.е. можно ставить и **всю схему, и отдельные APK — в обе схемы одинаково**.
-Конкретные пакеты в CLI — по именам: `./deepl dyn install Fota WT_Link`.
-
-Бинарники static (без зависимостей): Linux x86-64 — `deepl`, Windows x86-64 — `deepl.exe`.
-Работает из папки, где лежит `targets.txt` (или задайте `DEEPL_TARGETS=/путь`).
-
-### shot — охота за runtime-фразами
-
-Применяется, когда фраза, которую надо перевести/найти, **не находится в APK**
-(исходники проверяем по `res/`/`resources.arsc`/`assets`/`dex`/`.so`): она
-приходит runtime — сцены (scene.db), TTS-ответы, ASR-правила, шина (ADAS).
-
-```bash
-./shot -cjk -d 180                  # 180 с: показать сценарий на ГУ; снять все CJK-фрагменты
-./shot -q "请检查四周情况" -q "即将执行" -d 120   # конкретные фразы + контекст ±3 строки + pid→app
-./shot -offline logs/logshot/shot_<ts>.log -cjk    # повторный разбор старого снимка
-```
-
-Результат — в `logs/logshot/`: `shot_<ts>.log` (весь снимок),
-`shot_<ts>.meta.txt` (окружение: locale, pids камеры/сцен),
-`shot_<ts>.hits.txt` (отчёт: совпадения + частотный CJK-фрагмент-отчёт + PID-карты).
+| Симптом | Что делать |
+|---|---|
+| ADB «не найдено» | `[R]` в меню; USB/ADB/авторизация; `adb.exe` — в PATH, рядом с `deepl` или `DEEPL_ADB=/путь` |
+| Пакет установлен, но китайский | `[3]` → снова `[1]` (или reboot); `[5]` — оверлей должен быть `[x]` |
+| Оверлей `---` (ошибка) | `[6] Диагностика`, `[7] Report`, `enable` ещё раз |
+| Статика: remount не прошёл | только динамический вариант |
+| RU не во всём (например, детали «Умного обслуживания») | данные с сервера, не ресурсы — RRO не покрывает |
+| Перевести фразу, которой нет в APK (runtime) | `shot -cjk -d 180` (показать сценарий на ГУ), передать фразу переводчику |
 
 ## Примечания
 
-- В обоих схемах перевод только ресурсов (values-ru); layout-литералы
-  встроенные в XML прошивки оверлеем не покрываются (проектное ограничение).
-- 8 длинних строк (условия/соглашения) превышают aapt2-лимит 32 700 байт
-  UTF-8 — они НЕ входят в оверлеи (на экране — исходный текст); остальные
-  18800 строк — в оверлеях.
-- Платформенный ключ подписи — стандартный AOSP public key (никаких секретов).
+- Некоторые процессы увидят RU только после собственного перезапуска
+  (закрыть из «недавних») либо reboot.
+- Старые `manage.bat`/`manage_static.bat` в релиз больше не входят —
+  весь их функционал в `deepl` (включая `[9]`-локаль).

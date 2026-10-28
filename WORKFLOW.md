@@ -29,7 +29,7 @@ python3 test_improve_selftest.py                      # 7. self-test (90/90)
 ```
 Входы/выходы проверены: повторный прогон из чистого состояния не воспроизводит
 потерю строк с разметкой (ET-путь извлечателя) и тихие «STRING_TOO_LARGE»
-(create_rro_* теперь FAIL'ит приложение, аapt2 предупреждение — в STDOUT,
+(create_rro_* теперь FAIL'ит приложение, aapt2-предупреждение — в STDOUT,
 rc=0; validate.py делает их ошибкой).
 
 ---
@@ -77,9 +77,13 @@ deepal-HU-translate/
 ├── logshot/                       # shot (Go): снимок live-logcat + охота за фразой
 │   # (runtime-фразы, которых нет в APK: scene.db/ASR/TTS). logs/logshot/*.
 │   #   shot.exe -cjk -d 180 / -q "фраза" / -offline shot_*.log  (logshot/README.md)
-└── install_static_8.bat / _36.bat / install_all_static.bat / uninstall_all_static.bat
-    # Статические (com.deepal.*), /vendor/overlay/
+├── build_go.sh                      # сборка Go (deepl + shot): gofmt/vet/test/build
+└── build_release.sh                 # релиз: тег v3.2.0-N + GitHub-release (zip)
 ```
+
+> Обёртки `install_static_8/36.all`, `install_all_static`, `uninstall_all_static`
+> **удалены (конец 09)** — функционал в `deepl` (presets `8`/`A`/`auto`)
+> и `manage_static.bat` (legacy).
 
 ---
 
@@ -293,19 +297,21 @@ translations/exclude.json  →  { "App": { "name": "причина" }, ... }
 
 ## Шаг 6. Установить RRO APK на ГУ
 
-Для динамических RRO APK (из `apks_rro_min/`) — bat запускается на Windows-машине
-с adb (пакеты `com.android.vendor.translate.rro.*` — bat их «знает»):
+Основной инструмент — **`deepl`** (Go; в релизе: `deepl`, `deepl.exe`;
+сборка — `bash build_go.sh`):
 
-```bat
-REM Единый менеджер динамических RRO:
-manage.bat                                    REM интерактивное меню
-manage.bat install 8                          REM copy + install + enable, top-8
-manage.bat install A                          REM все группы (1+2+3+4)
-manage.bat disable 8
-manage.bat diag
-manage.bat report                             REM zip-логи для анализа
-manage.bat enable 2 / disable 3 / uninstall A REM остальные режимы
 ```
+./deepl                # интерактивное меню динамических RRO
+./deepl stat           # интерактивное меню СТАТИЧЕСКИХ
+./deepl dyn install 8  # CLI: top-8 (install + enable)
+./deepl dyn install A  # CLI: все группы
+./deepl stat install auto
+./deepl dyn locale-restore   # [9] в меню: вернуть zh-CN
+```
+
+> ⚠ `manage.bat` / `manage_static.bat` — legacy-малы, держимся в репозитории
+> для совместимости (они не идут в релиз): все команды есть в `deepl`
+> (и меню, и CLI), а пункт `[9]` (локаль) — только в `deepl` и новых ревизиях.
 
 > В интерактивном меню всегда виден баннер статуса ADB (быстрая проверка) и
 > пункт **[R]** «проверить заново» (полная проверка + рестарт демона). Меню
@@ -347,20 +353,19 @@ python3 create_rro_static.py --only WT_NewLauncher
 
 ## Шаг 8. Установить статические RRO APK на ГУ
 
-```bat
-REM Менеджер статических RRO (root, /vendor/overlay):
-manage_static.bat                REM интерактивное меню
-manage_static.bat install 8      REM 8 критичных (top-8)
-manage_static.bat install A      REM все группы
-manage_static.bat uninstall A
-manage_static.bat report         REM zip-логи для анализа
+```
+./deepl stat             # интерактивное меню статических (root, /vendor/overlay)
+./deepl stat install A   # CLI: все группы
+./deepl stat install auto
+./deepl stat uninstall auto
+./deepl stat report      # zip-логи для анализа
 ```
 
-Или вручную:
+Или вручную (имя пакета = префикс + нижний регистр APK, underscore остаётся):
 ```bash
 adb root && adb remount
-adb shell mkdir -p /vendor/overlay/AdayoAPA
-adb push apks_rro_static/AdayoAPA_RRO.apk /vendor/overlay/AdayoAPA/
+adb shell mkdir -p /vendor/overlay/com.deepal.translate.rro.adayoapa
+adb push apks_rro_static/AdayoAPA_RRO.apk /vendor/overlay/com.deepal.translate.rro.adayoapa/
 adb reboot
 ```
 
@@ -371,13 +376,14 @@ adb reboot
 Если перевод на ГУ работает не так (строки не меняются, часть приложений
 не переведены, приложения падают) — собрать диагностический пакет:
 
-```bat
-manage.bat report            REM динамические:  logs\deepal_dynamic_report_<TS>.zip
-manage_static.bat report     REM статические:   logs\deepal_static_report_<TS>.zip
+```
+./deepl report dyn     # динамические:  logs/deepl_dynamic_report_<TS>.zip
+./deepl report stat    # статические:   logs/deepl_static_report_<TS>.zip
+./deepl                # или из меню: пункт [7] (dyn) / [5] (stat)
 ```
 
-`collect_report.bat` (вызывается обоими) собирает **только чтение** — ничего
-на устройстве не меняет и не удаляет:
+`deepl report` (legacy: `manage{,_static}.bat report` через `collect_report.bat`)
+собирает **только чтение** — ничего на устройстве не меняет и не удаляет:
 1. `raw/20_packages_ours.txt` — `pm list --show-versioncode` наших пакетов
    (установлены ли, какой versionCode);
 2. `raw/25_overlay_all.txt` — полный `cmd overlay list --user 0`;
@@ -405,8 +411,9 @@ manage_static.bat report     REM статические:   logs\deepal_static_re
 
 `collect_report.bat` снимает logcat «мгновенно» — живое поведение
 (фразы runtime, которые появляются на несколько секунд: voice-ответы,
-TTS, сценарные скрипты) так не поймать. Для этого — `logshot`
-(Go, `logshot/README.md`; сборка `logshot/build.sh` → `shot`/`shot.exe`):
+TTS, сценарные скрипты) так не поймать. Для этого — `shot`
+(Go, модуль `logshot/`, README — `logshot/README.md`;
+сборка `bash build_go.sh shot` → `shot`/`shot.exe`):
 
 ```bat
 shot.exe -cjk -d 180                           :: ВСЕ китайские фрагменты, 180 c
@@ -544,7 +551,7 @@ adb shell settings get global DriveMode
 
 | Версия | Дата | Изменения |
 |--------|------------|---------------------------------------------------------------------|
-| 5.18 | 2026-09-25 | **Отказ от reпак-варианта** (решение пользователя): файлы и данные шага 12 (axml.py, scan/translate/patch/verify, install_patched.bat, revert_patched.bat, layout_literals.json + логи) вынесены в `/home/user/projects/deepal-HU-translate-bak-repack/`; step 12 переведён в «ОТКЛОНЁН/архив»; TODO переписан; patched-APK на ГУ не были установлены (live-проверка не проводилась). `original_apks/` в бэкап НЕ отправлен (и туда не попал) — остался/вернулся в проект, т.к. нужен RRO-конвейеру (декомпиляция) |
+| 5.18 | 2026-09-25 | **Отказ от repack-варианта** (решение пользователя): файлы и данные шага 12 (axml.py, scan/translate/patch/verify, install_patched.bat, revert_patched.bat, layout_literals.json + логи) вынесены в `/home/user/projects/deepal-HU-translate-bak-repack/`; step 12 переведён в «ОТКЛОНЁН/архив»; TODO переписан; patched-APK на ГУ не были установлены (live-проверка не проводилась). `original_apks/` в бэкап НЕ отправлен (и туда не попал) — остался/вернулся в проект, т.к. нужен RRO-конвейеру (декомпиляция) |
 | 5.17 | 2026-09-24 | **Живой log `logs/bat/` (report 093642): `collect_report.bat` рвался на [7/9], отчёт обрывался пополам.** Корень: `collect_report.bat:270` — вторая строка многострочного `REM` в блоке дампа ANR **без приставки `REM`** (выпала при переносе) → cmd исполняет её как команду, неэкранированная `)` в `безвредно)` закрывает `if !N_ANR! GTR 0 (` досрочно, хвостовой `.` → `. was unexpected at this time.` → блок рвался до дампа трассы, [8/9]/[9/9]/`summary.txt`/zip не выполнялись. Wine-репро идентично живому обрыву. Починено: `REM` на :270. Второй (неблокирующий) дефект того же прогона — `The system cannot find the file specified.` в banner `:CollectReport`: литеральный `<TS>`/`<pkg>` в `echo` = input-redirection → экранировано `^<…^>` в `manage.bat:567`, `manage_static.bat:540`, `install_all_static.bat:50`. Установка в прогоне 24.09 в порядке: 91/100 (9 AOSP-target ожидаемо не ставятся), WT_WtSystemUI `[ ]` (vendor-баг enable), wecarspeech FATAL (не наш) |
 | 5.16 | 2026-09-23 | **Итерация 2 по live-репорту 22.09 21:26.** Подтверждено: 22b-чинки работают (91/9, phonelink `[x]`, ver виден, 0 `---`). Новая волна починки: ops-логи были ПОТЕРЯНЫ (имя `ops_…_OTST:=_.log` — замена ПАРЫ `!X:=_!` в `:OpSTs` дала битое имя с `:`, файл не создавался) → таймстемп wmic/powershell `YYYYMMDDHHMMSS`; FATAL-счётчик (`find /C` = `---------- N C(S) FOUND`, токен1=дефисы → «---------- 0 - всё чисто» при 4 FATAL) → построчный счётчик как N_ANR; ANR-trace Permission denied (`anr_*`=system:system 600) → `adb root` ВСЕГДА перед дампом; `overlay enable` в install был скрыт (WT_WtSystemUI стоял `[ ]` без следов) → `:DoOpAdb` с выводом + retry + `[WARN]` в лог; хрупкий `"%%I"=="Success"` (хвостовой пробел/CR) → префикс-матч 7 символов. Summary: ровно 9 отсутствующих = «ОЖИДАЕМО» (9 AOSP-target) |
 | 5.15 | 2026-09-22 | **Живые логи HU (logs/bat/ + report-zip): manage.bat/отчёт починены.** Корень false-`[ERROR]`/«OK: N / Ошибок: N» — неэкранированные скобки в `RESULT:`-строках ops-лога (та же класс-бага, что 5.12, но на строках в ЛОГ; экранированы в manage/manage_static + 3 Legacy-обёртки; wine-репро до/после). Формат `pm list` этого ГУ = `package:PKG versionCode:N` (пробел, без `=`) → парсер отчёта новый (было ложное 0/100, стало 90/10; `tokens=3 delims=:`). GROUP3 `WT_PhoneLink`→`PhoneLink` (файл `PhoneLink_RRO.apk`, пакет `…rro.phonelink`). ANR-dump: `head -150 /data/anr/$f` (полный путь). **Найденные на устройстве:** 9 dynamic-оверлеев с AOSP-target не ставятся `adb install` (DELETE_FAILED_INTERNAL_ERROR, нет в overlay list) — решение: static или исключение из групп; WT_WtSystemUI STATE_DISABLED → enable; vendor-краш wecarspeech (NumberFormatException, не наш) |
