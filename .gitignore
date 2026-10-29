@@ -29,5 +29,10 @@ __pycache__/
 *.tmp
 ~$*
 
-# Платформенные бинарные тулзы (shot/deepl и их .exe) держим в git —
-# проект разрабатывается и на Windows (.bat), и на Linux (.sh).
+# --- Бинарные тулзы (deepl/shot, linux+win) ---
+# Не храним в git: собираются `bash build_go.sh` из исходников
+# (go/ — deepl, logshot/ — shot); в релиз их кладёт build_release.sh с диска.
+deepl
+deepl.exe
+shot
+shot.exe

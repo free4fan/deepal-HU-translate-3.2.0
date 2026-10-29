@@ -10,10 +10,10 @@
 > + **80** non-CJK-записей из БД (итого 18808 непустых `ru`).
 
 Исключения (не входят в список RRO, т.к. не ставятся `adb install` — 
-см. `EXCLUDE9` в manage.bat): NetworkStack, MediaProviderLegacy, 
+см. `EXCLUDE9` в `targets.txt`): NetworkStack, MediaProviderLegacy, 
 UserDictionaryProvider, DownloadProvider(+)Ui, CompanionDeviceManager, 
 MtpService, CaptivePortalLogin, ContactsProvider — переводятся статикой 
-(`manage_static.bat`, `/vendor/overlay`, root).
+(`./deepl stat` / `manage_static.bat`, `/vendor/overlay`, root).
 
 **Без оверлея вовсе** (04.10, `NO_OVERLAY_APPS` в generate_overlays*.py): 
 `WT_ThemeResourcesHolder` / `WT_ThemeResourcesTheme` — любой включённый RRO 

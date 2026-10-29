@@ -59,6 +59,8 @@ logshot/build.sh          # gofmt + vet + тесты + ./shot (linux) + ./shot.e
 logshot/build.sh --no-test
 ```
 
+Единый вход (deepl + shot вместе): `bash build_go.sh shot` из корня.
+
 Модуль `logshot/` — отдельный Go-модуль (есть свой `go.mod`), не зависит
 от `go/` (deepl). Бинарники — в корне проекта (`shot`, `shot.exe`).
 

@@ -146,7 +146,7 @@ func TestRunDynamic(t *testing.T) {
 		t.Errorf("30_per_package: нет camera строки\n%s", string(pp))
 	}
 	if !strings.Contains(string(pp), pfx+"wt_newlauncher | ver=3 | overlay=[ ]") {
-		t.Errorf("30_per_package: нет wt_newlauncher (цель WT_NewLauncher; старое имя wt_launcher\n      более не в groups)\n%s", string(pp))
+		t.Errorf("30_per_package: нет wt_newlauncher (цель WT_NewLauncher — как в\n      корневом targets.txt, который report грузит при старте)\n%s", string(pp))
 	}
 	// 44_overlay_main: overlay/idmap строки, без plain
 	o44, _ := os.ReadFile(filepath.Join(dir, "report_2026-09-29_100000", "raw", "44_overlay_main.txt"))

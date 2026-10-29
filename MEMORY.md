@@ -72,13 +72,15 @@ targetName-фикса) → в WT_VehicleCenter «Дисплей» все 3 кн�
 
 **ПРИЧИНА ЧТО НЕ EXCLUDE9:** `manage_static.bat:67` =
 `GROUP1=!GROUP1! !EXCLUDE9!` — EXCLUDE9 dynamic-исключает, но static-
-ВКЛЮЧАЕТ (в `/vendor/overlay`). RRO на temки ломает ОБОИХ схемы одинаково
+ВКЛЮЧАЕТ (в `/vendor/overlay`). RRO на темы ломает ОБЕ схемы одинаково
 (скин-сервис смотрит оверлеи по target, не по схеме). → НОВОЕ понятие
 **`NO_OVERLAY_APPS`** = «НЕ СОБИРАТЬ ОВЕРЛЕЙ ВООБЩЕ» (в отличии от
 exclude.json — «строки-ключи, но оверлей собирать»).
 
 **РЕШЕНИЕ (04.10b, утверждено):**
-- `targets.txt` (корень + копия `go/internal/groups/targets.txt`): из GROUP2
+- `targets.txt` (корень; бэкап-копия `go/internal/groups/targets.txt`
+  удалена 29.10 — бинарник списка не несёт, читает `DEEPL_TARGETS`/CWD):
+  из GROUP2
   вынесены `WT_ThemeResourcesHolder/Theme` → комментарий (102→100 приложений,
   93→91 adb). **Go-тест `TestRootFileData` вернулся зелёным (expected 91)** —
   был красный с 3.2.0 (тест писался в 3.1.2).
@@ -811,8 +813,9 @@ locale, /vendor/overlay, crash/FATAL/ANR(+trace, auto root), main-лог
   Android SDK 34 (`/opt/android-sdk/...`), `aapt2`/`apksigner`, `keys/platform.jks`.
 - Проект **в git** (main, 18.10): identity `free4fan`. `.gitignore` исключает
   тяжёлые регенерируемые каталоги (decompiled/, extracted/, original_apks/,
-  overlays*/, apks_rro_*/, overlay_build*/) + database/ + logs/ + __pycache__/.
-  Транслируем: исходники, *.py/*.bat/.sh, tools (shot/deepl), keys/, translations*/.
+  overlays*/, apks_rro_*/, overlay_build*/) + database/ + logs/ + __pycache__/
+  + бинарники deepl/shot (29.10: не храним, сборка `bash build_go.sh`).
+  Транслируем: исходники, *.py/*.bat/.sh, keys/, translations*/.
   Бэкап критичных правок теперь = git commit (раньше — вручную в /tmp/opencode/bak_*.json).
 
 ## Ширина RU vs ZH (перенос на 2 строки) — 19.09
@@ -930,7 +933,7 @@ layout-текстов — `%s` в `android:text` тоже гоняется).
   — выросли после правок 27.09/01.10)**. Полный перевод есть в
   `translations/*.json` (поле `ru`), включаются только при split-рефакторинге
   приложения. Генератор печатает `[WARN] … не влезли в лимит aapt2`;
-  `validate.py` — 8 WARN «не влезает в аapt2-лимит».
+  `validate.py` — 8 WARN «не влезает в aapt2-лимит».
 - `apply_db_translations.py` — только «пополнение пустых»; все прогоны
   завершены, можно гонять через `--dry-run`.
 - **bat-менеджеры: adb-зависимое не проверено автоматически.** Wine (20.09)

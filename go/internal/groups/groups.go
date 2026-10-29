@@ -248,7 +248,7 @@ func (c *Config) ResolvePreset(preset string) ([]string, string, bool) {
 		return nil, preset, false
 	}
 	// Прочее — имя(на) пакетов (регистр не важен, для Package() — ToLower):
-	// "Camera" | "WT_Launcher AdayoDvr" ...
+	// "Camera" | "WT_NewLauncher AdayoDvr" ...
 	names := strings.Fields(preset)
 	if len(names) == 0 {
 		return nil, preset, false

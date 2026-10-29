@@ -68,12 +68,14 @@ deepal-HU-translate/
 │   # автопроверка / LLM-улучшение в ru / системный промпт
 ├── create_app_pipeline.sh / export-to-db.sh
 │   # прогонщики: полный цикл сборки / create_db+validate
-├── manage.bat                     # менеджер ДИНАМИЧЕСКИХ RRO
-│   # (install/enable/disable/uninstall/status/diag/report), CLI:
-│   #   manage.bat <mode> <preset>
+├── manage.bat                     # менеджер ДИНАМИЧЕСКИХ RRO (legacy, вне релиза)
+│   # (install/enable/disable/uninstall/status/diag/report/reboot/locale-restore)
+│   #   CLI: manage.bat <mode> [<preset>] — reboot/locale-restore без цели
 ├── manage_static.bat              # менеджер СТАТИЧЕСКИХ RRO (root, /vendor/overlay)
-│   # (install/uninstall/status/diag/report)
+│   # (install/uninstall/status/diag/report/reboot/locale-restore)
 ├── collect_report.bat             # вызывается report из обоих: сборка zip-лога
+├── targets.txt                    # ЕДИНЫЙ источник списков целей (группы 1-4, TOP-8, EXCLUDE9)
+├── go/                            # deepl (Go): менеджер RRO (обе схемы, меню + CLI)
 ├── logshot/                       # shot (Go): снимок live-logcat + охота за фразой
 │   # (runtime-фразы, которых нет в APK: scene.db/ASR/TTS). logs/logshot/*.
 │   #   shot.exe -cjk -d 180 / -q "фраза" / -offline shot_*.log  (logshot/README.md)
@@ -309,9 +311,10 @@ translations/exclude.json  →  { "App": { "name": "причина" }, ... }
 ./deepl dyn locale-restore   # [9] в меню: вернуть zh-CN
 ```
 
-> ⚠ `manage.bat` / `manage_static.bat` — legacy-малы, держимся в репозитории
-> для совместимости (они не идут в релиз): все команды есть в `deepl`
-> (и меню, и CLI), а пункт `[9]` (локаль) — только в `deepl` и новых ревизиях.
+> ⚠ `manage.bat` / `manage_static.bat` — legacy (держим в репозитории
+> для совместимости, в релиз не идут): те же команды есть в `deepl`
+> (меню и CLI), включая `[9]`/`locale-restore` (локаль) и `reboot`
+> без выбора цели.
 
 > В интерактивном меню всегда виден баннер статуса ADB (быстрая проверка) и
 > пункт **[R]** «проверить заново» (полная проверка + рестарт демона). Меню
