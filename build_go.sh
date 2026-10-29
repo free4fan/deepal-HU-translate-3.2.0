@@ -95,5 +95,6 @@ echo "========================================================"
 echo "  ГОТОВО (в корне проекта $ROOT):"
 ls -la "$ROOT/deepl" "$ROOT/deepl.exe" "$ROOT/shot" "$ROOT/shot.exe" 2>/dev/null | awk '{print "    " $NF, "($" $5 " байт)"}'
 echo .
-echo "  Не забудьте: git add deepl deepl.exe shot shot.exe"
+echo "  Бинарники в .gitignore — коммитить не надо; релиз берёт их с диска"
+echo "  (build_release.sh)."
 echo "========================================================"

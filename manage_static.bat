@@ -80,7 +80,7 @@ REM ================== аргументы ==================
 if "%~1"=="" goto MENU
 set "CLI=1"
 set "MODE=%~1"
-if /i not "%MODE%"=="install" if /i not "%MODE%"=="uninstall" if /i not "%MODE%"=="status" if /i not "%MODE%"=="diag" if /i not "%MODE%"=="report" if /i not "%MODE%"=="reboot" goto MENU
+if /i not "%MODE%"=="install" if /i not "%MODE%"=="uninstall" if /i not "%MODE%"=="status" if /i not "%MODE%"=="diag" if /i not "%MODE%"=="report" if /i not "%MODE%"=="reboot" if /i not "%MODE%"=="locale-restore" goto MENU
 call :ADB_CHECK
 if not "!A_OK!"=="1" (
     echo.
@@ -89,10 +89,13 @@ if not "!A_OK!"=="1" (
     echo   ADB, повторная проверка - пункт [R].
     exit /b 1
 )
-if /i "%MODE%"=="status"   set "TARGETS=ok"
-if /i "%MODE%"=="diag"     set "TARGETS=ok"
-if /i "%MODE%"=="report"   set "TARGETS=ok"
-if /i "%MODE%"=="reboot"   set "TARGETS=ok"
+REM Без выбора цели (режимы не работают с группами): status/diag/report/
+REM reboot/locale-restore -> сразу RUN.
+if /i "%MODE%"=="status"         set "TARGETS=ok"
+if /i "%MODE%"=="diag"           set "TARGETS=ok"
+if /i "%MODE%"=="report"         set "TARGETS=ok"
+if /i "%MODE%"=="reboot"         set "TARGETS=ok"
+if /i "%MODE%"=="locale-restore" set "TARGETS=ok"
 if defined TARGETS goto RUN
 set "PRESET=%~2"
 if "%PRESET%"=="" goto GROUP_MENU
@@ -140,12 +143,14 @@ if "!A_UNAUTH!"=="1" (
     set /a A_UNAUTH_TOTAL+=1
     if !A_UNAUTH_TOTAL! GEQ 3 (
         echo   Авторизации нет после 3 ожиданий - остановка проверки.
-        echo   Разрешите USB-отладку на устройстве и повторите проверку.
+        echo   Скопируйте ключ adb ^(adbkey.pub^) этого ПК на ГУ приложением
+        echo   adbauth на ГУ ^("Добавить ADB-ключ с USB"^) и повторите проверку.
         exit /b 0
     )
-    echo   Устройство подключено, но USB-отладка НЕ АВТОРИЗОВАНА.
-    echo   НА УСТРОЙСТВЕ: нажмите "АВТОРИЗОВАТЬ", желательна галка
-    echo   "Всегда разрешать". Жду 45 сек... Ctrl+C - отмена.
+    echo   Устройство подключено, но USB-отладка НЕ АВТОРИЗОВАНА: ключ adb
+    echo   этого ПК не добавлен на ГУ ^(на 3.1.2 авторизация по ключу^).
+    echo   Исправление: скопировать adbkey.pub этого ПК на ГУ приложением
+    echo   adbauth на ГУ ^("Добавить ADB-ключ с USB"^). Жду 45 сек... Ctrl+C - отмена.
     timeout /t 45 >nul
     goto ADB_LOOP
 )
@@ -155,8 +160,7 @@ if !A_N! GEQ 3 (
     echo ERROR: ADB device not available after 3 attempts.
     echo   Попробуйте:
     echo    - USB-кабель и режим передачи файлов, а не только зарядки;
-    echo    - на устройстве: Параметры - Для разработчиков - USB-отладка - вкл;
-    echo    - галочка "АВТОРИЗОВАТЬ" на экране устройства;
+    echo    - на ГУ: включить ADB ^(инженерное меню ГУ или приложение adbauth на ГУ^);
     echo    - вручную: adb kill-server, затем adb devices
     exit /b 0
 )
@@ -231,7 +235,7 @@ call :ADB_CHECK_FAST
 if "!A_OK!"=="1" (
     set "A_DBANNER= [OK] ADB: устройство подключено"
 ) else (
-    set "A_DBANNER= [!!] ADB: устройство НЕ найдено — подключите USB, разрешите отладку (кнопка «АВТОРИЗОВАТЬ» на экране HU), после исправления - [R]"
+    set "A_DBANNER= [!!] ADB: устройство НЕ найдено — подключите USB и включите ADB на ГУ (инженерное меню или приложение adbauth на ГУ), после исправления - [R]"
 )
 cls
 echo ============================================================
