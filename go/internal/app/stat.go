@@ -33,6 +33,7 @@ func (a *App) runStatic(mode Mode, targets []string, ol *opslog.OpsLog, start ti
 
 // rootRemount — из manage_static.bat :ROOT_CHECK.
 // adb root -> shell живёт? -> mount -o rw,remount /vendor (fallback: adb remount).
+// Оба не прошли -> printVerityHint (dm-verity: avbctl disable-verification + reboot).
 // false -> операция не выполняется (CLI: пауза+exit/1; меню: возврат).
 func (a *App) rootRemount() bool {
 	a.print("Obtaining root access...\n")
@@ -46,11 +47,26 @@ func (a *App) rootRemount() bool {
 	if res := a.Adb.Shell(a.Ctx, "mount", "-o", "rw,remount", "/vendor"); !res.OK() {
 		if !a.remount() {
 			a.print("ERROR: Cannot remount /vendor as read-write.\n")
+			a.printVerityHint()
 			return false
 		}
 	}
 	a.print("[OK] /vendor is writable.\n\n")
 	return true
+}
+
+// printVerityHint — на userdebug с рабочим `adb root` read-only /vendor —
+// почти всегда dm-verity (AVB): раздел защищён от записи, пока не отключена
+// проверка целостности. Лечение однократное: disable-verification + reboot.
+func (a *App) printVerityHint() {
+	a.print("  Вероятная причина: dm-verity (AVB) — раздел /vendor защищён от записи.\n")
+	a.print("  Лечение (ОДНОКРАТНО, ГУ перезагрузится):\n")
+	a.print("    adb root\n")
+	a.print("    adb shell avbctl disable-verification\n")
+	a.print("    adb reboot\n")
+	a.print("  После перезагрузки повторите [1] (установку) — remount пройдёт.\n")
+	a.print("  Проверка (до лечения): adb shell getprop ro.boot.verifiedbootstate\n")
+	a.print("    orange = верификация включена; yellow/green — смотрите дальше.\n")
 }
 
 // remount — `adb remount` (не shell: отдельная команда adb на хосте).

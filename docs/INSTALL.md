@@ -38,8 +38,10 @@
   `adb install` (лимит подписи, `INSTALL_FAILED_INTERNAL_ERROR`) — поэтому
   реально устанавливается **91 из 100** (списки в `targets.txt` это знают).
 - **Статические** — те же 100, включая 9 AOSP: ложатся в `/vendor/overlay`
-  (нужен `adb root` + remount, `deepl stat` делает сам). Минус: только
-  root и перезагрузка после установки; плюс: «зафиксированы», не зависят
+  (нужен `adb root` + remount, `deepl stat` делает сам). Если remount
+  рвётся (`Cannot remount /vendor`) — это dm-verity, см. раздел
+  «Если `adb remount` не проходит» ниже. Минус: только root и
+  перезагрузка после установки; плюс: «зафиксированы», не зависят
   от `/data` (переживают сброс настроек пользователя).
 
 Что переводится, что нет — переводятся **строки ресурсов** приложений
@@ -114,8 +116,8 @@ for f in apks_rro_min/*_RRO.apk; do
 done
 ```
 
-**Статические** (нужен root+remount; на части прошивок remount запрещён
-(verity) — тогда только динамическое):
+**Статические** (нужен root+remount; если `adb remount` рвётся на
+`Cannot remount /vendor as read-write` — это dm-verity/AVB, см. ниже):
 
 ```bash
 adb root && adb remount
@@ -128,7 +130,29 @@ adb reboot
 ```
 
 > Имя пакета = префикс + имя APK в нижнем регистре (underscore остаётся):
-> `WT_NewLauncher_RRO.apk` → `com.android.vendor.translate.rro.wt_newlauncher`.
+> динамические — `com.android.vendor.translate.rro.<app>`,
+> статические — `com.deepal.translate.rro.<app>`.
+> Пример: `WT_NewLauncher_RRO.apk` → `com.deepal.translate.rro.wt_newlauncher`
+> (в статике).
+
+### Если `adb remount` не проходит (dm-verity / AVB)
+
+Ошибка `Cannot remount /vendor as read-write` — раздел `/vendor` защищён
+верификацией (verified boot). Лечение **однократное** (ГУ перезагрузится,
+данные не затрагиваются):
+
+```bash
+adb root
+adb shell avbctl disable-verification   # отключает верификацию, 1 раз
+adb reboot
+# после перезагрузки:
+adb root && adb remount                 # теперь пройдёт
+```
+
+`deepl` (пункт `[1]` в меню статики) показывает эти же шаги в ошибке.
+Проверка до лечения: `adb shell getprop ro.boot.verifiedbootstate`
+(`orange` = верификация включена). После обновления прошивки или сброса
+заводами обработку может потребоваться повторить.
 
 ## Проверка
 
@@ -160,7 +184,7 @@ adb reboot
 | ADB «не найдено» | `[R]` в меню; кабель/ADB; `unauthorized` — ключ adbkey.pub на ГУ приложением adbauth (см. «Подключение») |
 | Пакет установлен, но китайский | `[3] Отключить` → `[1] Установить` снова (или reboot); проверьте `[5] Статус`, что оверлей `[x]` |
 | Оверлей `---` (ошибка) | `[6] Диагностика`, `[7]` отчёт; изредка — `enable` ещё раз |
-| Статика: remount не прошёл (`verity`) | только динамический вариант |
+| Статика: `Cannot remount /vendor as read-write` | dm-verity (AVB). Однократно: `adb root` → `adb shell avbctl disable-verification` → `adb reboot` → повторить `[1]` (deepl сам показывает эти шаги) |
 | `deepl` не видит `adb` | `adb.exe` в PATH, рядом с `deepl`, или `DEEPL_ADB=/путь/adb` |
 | RU есть не во всём (например, детали «Умного обслуживания») | это данные с сервера (не ресурсы) — RRO не покрывает, остаётся как есть |
 | Хочу перевести фразу, которой нет ни в одном экране в APK | она runtime (сцены/TTS/ASR): `shot -cjk -d 180` (показать сценарий), потом передать фразу переводчику |

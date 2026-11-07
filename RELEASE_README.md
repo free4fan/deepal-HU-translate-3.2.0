@@ -74,7 +74,7 @@ for f in apks_rro_min/*_RRO.apk; do
   adb shell cmd overlay enable --user 0 com.android.vendor.translate.rro.$app
 done
 
-# статические (нужен root+remount; на части прошивок remount запрещён (verity)):
+# статические (нужен root+remount; если «Cannot remount /vendor» — см. ниже):
 adb root && adb remount
 for f in apks_rro_static/*_RRO.apk; do
   app=$(basename "$f" _RRO.apk | tr '[:upper:]' '[:lower:]')
@@ -83,6 +83,25 @@ for f in apks_rro_static/*_RRO.apk; do
 done
 adb reboot
 ```
+
+### Если `adb remount` не проходит (dm-verity / AVB)
+
+Ошибка `Cannot remount /vendor as read-write` — раздел `/vendor` защищён
+верификацией (verified boot). Лечение **однократное** (ГУ перезагрузится,
+данные не затрагиваются):
+
+```bash
+adb root
+adb shell avbctl disable-verification   # отключает верификацию, 1 раз
+adb reboot
+# после перезагрузки:
+adb root && adb remount                 # теперь пройдёт
+```
+
+`deepl` (пункт `[1]` в меню статики) показывает эти же шаги в ошибке.
+Проверка до лечения: `adb shell getprop ro.boot.verifiedbootstate`
+(`orange` = верификация включена). После обновления прошивки или сброса
+заводами обработку может потребоваться повторить.
 
 ## Проверка
 
@@ -99,7 +118,7 @@ adb reboot
 | ADB «не найдено» / `unauthorized` | `[R]` в меню; кабель/ADB/ключ: `adbauth` на ГУ (adbkey.pub с флешки); `adb.exe` — в PATH, рядом с `deepl` или `DEEPL_ADB=/путь` |
 | Пакет установлен, но китайский | `[3]` → снова `[1]` (или reboot); `[5]` — оверлей должен быть `[x]` |
 | Оверлей `---` (ошибка) | `[6] Диагностика`, `[7] Report`, `enable` ещё раз |
-| Статика: remount не прошёл | только динамический вариант |
+| Статика: `Cannot remount /vendor as read-write` | dm-verity: однократно `adb root` → `adb shell avbctl disable-verification` → `adb reboot` → повторить `[1]` (deepl покажет шаги сам) |
 | RU не во всём (например, детали «Умного обслуживания») | данные с сервера, не ресурсы — RRO не покрывает |
 | Перевести фразу, которой нет в APK (runtime) | `shot -cjk -d 180` (показать сценарий на ГУ), передать фразу переводчику |
 

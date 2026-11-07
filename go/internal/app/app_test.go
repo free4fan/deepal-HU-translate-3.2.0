@@ -49,6 +49,13 @@ func (m *mockClient) Shell(ctx context.Context, args ...string) adb.Result {
 		m.locale = "zh-CN"
 		m.locales = append(m.locales, "zh-CN")
 		return adb.Result{Code: 0}
+	case "shell mount -o rw,remount /vendor":
+		// при dm-verity оба пути (mount и adb remount) не проходят —
+		// привязано к remountOK, как на реальном ГУ;
+		if m.remountOK {
+			return adb.Result{Code: 0}
+		}
+		return adb.Result{Out: "mount: failed to remount /vendor as read-write: Device or resource busy\n", Code: 1}
 	default:
 		return adb.Result{Out: "", Code: 0}
 	}
@@ -513,6 +520,39 @@ func setupStatic(t *testing.T) (*groups.Config, *mockClient, *appWithApp) {
 	w.Cfg = cfg
 	w.Logs = filepath.Join(dir, "logs")
 	return cfg, m, w
+}
+
+// TestRunStaticInstall_Verity — /vendor не перезаписывается (dm-verity/AVB):
+// установка НЕ выполняется; вывод — диагноз + команды лечения.
+func TestRunStaticInstall_Verity(t *testing.T) {
+	cfg, m, w := setupStatic(t)
+	m.remountOK = false // mount -o rw,remount и adb remount оба не проходят
+	os.WriteFile(filepath.Join(cfg.ApkDir, "Camera_RRO.apk"), []byte("x"), 0o644)
+
+	o, err := w.Run(ModeInstall, "8")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if o.Total != 0 {
+		t.Errorf("установка не должна выполняться при read-only /vendor: %+v", o)
+	}
+	out := w.buf.String()
+	for _, want := range []string{
+		"Cannot remount /vendor as read-write",
+		"dm-verity",
+		"avbctl disable-verification",
+		"adb reboot",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("вывод не содержит %q:\n%s", want, out)
+		}
+	}
+	for _, c := range m.calls {
+		if strings.Contains(c, "push ") {
+			t.Errorf("push вызван при недоступном /vendor: %v", m.calls)
+			break
+		}
+	}
 }
 
 func TestRunStaticInstall(t *testing.T) {
